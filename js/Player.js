@@ -6,13 +6,12 @@ function Player(gameArea)
     this.enableTimeout = 5000;
     this.gameArea = gameArea;
     this.id = 0;
-    this.isActive = true;
     this.isEnabled = true;
     this.wasUsingAbilityLastFrame = false;
     this.lastActivatedFrame = -1000;
     this.lastProjectile = -1;
     this.maxAngularSpeed = 3;
-    this.maxSpeed = 3;
+    this.maxSpeed = 5;
     this.rect = new Rectangle(25, 25);
     this.angularSpeed = .05;
     this.speed = [0, 0];
@@ -37,10 +36,6 @@ Player.prototype =
     {
         return (player.team != this.team ||
             (player.team  == "White" && player.id != this.id));
-    },
-    doesProjectileHit: function(projectile)
-    {
-        return this.rect.intersectsPoint(projectile.x, projectile.y);
     },
     draw: function()
     {
@@ -73,7 +68,7 @@ Player.prototype =
     },
     reEnable: function()
     {
-        this.gameArea.connection.send(JSON.stringify({ type: 'enablePlayer', data: this.id}));
+		this.gameArea.setPlayerIsEnabled(this.id, true, true);
     },
     getColors: function()
     {
@@ -90,6 +85,7 @@ Player.prototype =
                 {
                     colors.push("Blue");
                 }
+				break;
             case "Green":
                 colors.push("Green");
                 if (this.isEnabled)
@@ -100,6 +96,7 @@ Player.prototype =
                 {
                     colors.push("Green");
                 }
+				break;
             case "Red":
                 colors.push("Red");
                 if (this.isEnabled)
@@ -110,6 +107,7 @@ Player.prototype =
                 {
                     colors.push("Red");
                 }
+				break;
             case "White":
             default:
                 colors.push("White");
@@ -121,6 +119,7 @@ Player.prototype =
                 {
                     colors.push("White");
                 }
+				break;
         }
 
         return colors;
@@ -149,31 +148,36 @@ Player.prototype =
     {
         if (this.isProjectileOpponent(projectile))
         {
-            if (projectile.type === "Bullet")
+            if (projectile.type == "Bullet")
             {
-                this.gameArea.connection.send(JSON.stringify({ type: 'removePlayer', data: this.id}));
+				this.kill();
             }
-            else if (projectile.type === "Bomb")
+            else if (projectile.type == "Bomb")
             {
                 if (this.isEnabled)
                 {
                     var _this = this;
                     setTimeout(function()
                     {
-                        if (this)
+                        if (_this)
                         {
                             _this.reEnable();
                         }
                     }, this.enableTimeout);
-                    this.gameArea.connection.send(JSON.stringify({ type: 'disablePlayer', data: this.id}));
+					
+                    this.gameArea.setPlayerIsEnabled(this.id, false, true);
                 }
                 else
                 {
-                    this.gameArea.connection.send(JSON.stringify({ type: 'removePlayer', data: this.id}));
+					this.kill();
                 }
             }
         }
     },
+	intersects: function(shape)
+	{
+		return this.rect.intersects(shape);
+	},
     /**
      * Called once a frame to resolve interactions between players
      */
@@ -181,6 +185,11 @@ Player.prototype =
     {
         // No implementation at base
     },
+	kill: function()
+	{
+		this.gameArea.removePlayer(this.id, true);
+		this.gameArea.joinGame();
+	},
     processInput: function(keys, mouseX, mouseY)
     {
         this.speed = [0, 0];
@@ -249,9 +258,9 @@ Player.prototype =
         let cosAngle = Math.cos(this.angle);
         let sinAngle = Math.sin(this.angle);
         this.x = clamp(this.x + (this.speed[1] * cosAngle) + (this.speed[0] * sinAngle),
-            this.gameArea.bounds.tl.x, this.gameArea.bounds.br.x);
+            this.gameArea.bounds.x - this.gameArea.bounds.halfWidth, this.gameArea.bounds.x + this.gameArea.bounds.halfWidth);
         this.y = clamp(this.y + (this.speed[1] * sinAngle) - (this.speed[0] * cosAngle),
-            this.gameArea.bounds.tl.y, this.gameArea.bounds.br.y);
+            this.gameArea.bounds.y - this.gameArea.bounds.halfHeight, this.gameArea.bounds.y + this.gameArea.bounds.halfHeight);
 
         this.rect.update(this.x, this.y, this.angle);
     }
@@ -261,14 +270,11 @@ function CirclePlayer(gameArea)
 {
     Player.call(this, gameArea);
     this.type = "Sneak";
+	this.activationCooldown = 75;
 
     this.activateAbility = function()
     {
-        gameArea.connection.send(
-            JSON.stringify({ type: 'addProjectile', data: {type: "Bomb",
-            x: this.x,
-            y: this.y,
-            angle: this.angle, team: this.team, shooterId: this.id}}));
+		this.gameArea.addProjectile(-1, "Bomb", this.x, this.y, this.angle, this.team, this.id, true);
     }
 
     this.innerDraw = function(ctx)
@@ -292,15 +298,8 @@ function CirclePlayer(gameArea)
             // Remove and Detonate the current projectile, if it exists
             if (this.lastProjectile > 0 && gameArea.projectiles.get(this.lastProjectile))
             {
-                // Remove Projectile
-                gameArea.connection.send(JSON.stringify(
-                {
-                    type: 'removeProjectile',
-                    data: {
-                        id: this.lastProjectile
-                    }
-                }));
-
+				this.gameArea.removeProjectile(this.lastProjectile, true);
+				
                 this.lastProjectile = -1;
             }
             else
@@ -312,16 +311,15 @@ function CirclePlayer(gameArea)
 }
 CirclePlayer.prototype = new Player();
 
-function TrianglePlayer(gameArea) {
+function TrianglePlayer(gameArea)
+{
     Player.call(this, gameArea);
     this.type = "Shooter";
 
-    this.activateAbility = function() {
-        gameArea.connection.send(
-            JSON.stringify({ type: 'addProjectile', data: {type: "Bullet",
-            x: this.x + this.rect.halfHeight * Math.cos(this.angle),
-            y: this.y + this.rect.halfHeight * Math.sin(this.angle),
-            angle: this.angle, team: this.team, shooterId: this.id}}));
+    this.activateAbility = function()
+	{
+		gameArea.addProjectile(-1, "Bullet", this.x + this.rect.halfHeight * Math.cos(this.angle),
+			this.y + this.rect.halfHeight * Math.sin(this.angle), this.angle, this.team, this.id, true);
     }
 
     this.innerDraw = function(ctx)
@@ -362,6 +360,35 @@ function SquarePlayer(gameArea)
         ctx.stroke();
     }
 
+	this.draw = function()
+	{
+        let ctx = this.gameArea.context;
+		
+		var colors = this.getColors();
+		
+		// Draw base
+		ctx.beginPath();
+		ctx.moveTo(this.rect.points[0].x, this.rect.points[0].y);
+		for (let i = 1; i < this.rect.points.length; ++i)
+		{
+			ctx.lineTo(this.rect.points[i].x, this.rect.points[i].y);
+		}
+		ctx.closePath();
+		ctx.fillStyle = colors[0];
+		ctx.fill();
+		
+		// Draw Shield
+		ctx.beginPath();
+		ctx.moveTo(this.shieldRect.points[0].x, this.shieldRect.points[0].y);
+		for (let i = 1; i < this.shieldRect.points.length; ++i)
+		{
+			ctx.lineTo(this.shieldRect.points[i].x, this.shieldRect.points[i].y);
+		}
+		ctx.closePath();
+		ctx.fillStyle = colors[1];
+		ctx.fill();
+	}
+	
     this.innerDraw = function(ctx)
     {
         // Get Colors
@@ -379,11 +406,10 @@ function SquarePlayer(gameArea)
     this.hit = function(projectile)
     {
         // Bullets are blocked by the shield
-        if (projectile.type === "Bullet")
+        if (projectile.type == "Bullet")
         {
             if (!this.shieldRect.intersectsPoint(projectile.x, projectile.y))
             {
-                console.log('projectile did not hit shield');
                 Player.prototype.hit.call(this, projectile);
             }
         }
@@ -398,19 +424,18 @@ function SquarePlayer(gameArea)
      */
     this.interactWith = function(player)
     {
-        if (this.isPlayerOpponent(player) && player.isActive)
+        if (this.isPlayerOpponent(player) && this.isEnabled)
         {
-            if (this.shieldRect.intersectsRect(player.rect))
+            if (this.shieldRect.intersects(player.rect))
             {
-                this.gameArea.connection.send(JSON.stringify({ type: 'removePlayer', data: player.id}));
-                player.isActive = false;
+				player.kill();
             }
         }
     }
 
     this.update = function()
     {
-        // Update base`
+        // Update base
         Player.prototype.update.call(this);
 
         // Update shield location
@@ -427,7 +452,8 @@ SquarePlayer.prototype = new Player();
 function createPlayer(type, gameArea)
 {
     var player = null;
-    switch (type) {
+    switch (type)
+	{
         case "Shield":
             player = new SquarePlayer(gameArea);
             break;

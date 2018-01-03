@@ -107,7 +107,8 @@ var wsServer = new webSocketServer({
 
 // This callback function is called every time someone
 // tries to connect to the WebSocket server
-wsServer.on('request', function(request) {
+wsServer.on('request', function(request)
+{
     console.log((new Date()) + ' Connection from origin ' + request.origin + '.');
     // accept connection - you should check 'request.origin' to
     // make sure that client is connecting from your website
@@ -118,29 +119,34 @@ wsServer.on('request', function(request) {
     console.log((new Date()) + ' Connection accepted.');
 
     // user sent some message
-    connection.on('message', function(message) {
-        try {
+    connection.on('message', function(message)
+	{
+        try
+		{
           var json = JSON.parse(message.utf8Data);
-        } catch (e) {
+        }
+		catch (e)
+		{
           console.log('Invalid JSON: ', message.data);
           return;
         }
 
-        if (json.type == "joinRequest") {
-
+        if (json.type == "joinRequest")
+		{
             // Tell the client his location and type with a joinResponse
             var teams = ["Green", "Blue", "Red"];
             var types = ["Shield", "Shooter", "Sneak"];
 
             var playerObject = clientMap.get(this);
 
-            if (playerObject) {
+            if (playerObject)
+			{
                 playerObject.id = playerNum++;
                 playerObject.x = Math.random() * 1000;
                 playerObject.y = Math.random() * 600;
                 playerObject.angle = Math.random() * Math.PI * 2;
                 playerObject.team = "White";
-                playerObject.type = types[Math.floor(Math.random()*types.length)];
+                playerObject.type = types[Math.floor(Math.random() * types.length)];
             }
 
             var joinResponse = JSON.stringify({ type: 'joinResponse', data: playerObject.getJson()});
@@ -148,38 +154,47 @@ wsServer.on('request', function(request) {
             console.log((new Date()) + ' Sent message: ' + joinResponse);
 
             // Give new player the current location of all current players
-            for (var [connection, gameObject] of clientMap.entries()) {
-                if (gameObject && connection !== this) {
+            for (var [connection, gameObject] of clientMap.entries())
+			{
+                if (gameObject && connection != this)
+				{
                     var addPlayer = JSON.stringify({ type: 'addPlayer', data: gameObject.getJson()});
                     this.send(addPlayer);
                 }
             }
 
             // Iterate over all clients and indicate that a new player has come online
-            for (var [connection, gameObject] of clientMap.entries()) {
-                if (connection !== this) {
+            for (var [connection, gameObject] of clientMap.entries())
+			{
+                if (connection != this)
+				{
                     connection.send(
                         JSON.stringify({ type: 'addPlayer', data: playerObject.getJson()} ));
                 }
             }
         }
-        else if (json.type == 'updatePlayer') {
+        else if (json.type == 'updatePlayer')
+		{
             var playerObject = clientMap.get(this);
             playerObject.x = json.data.x;
             playerObject.y = json.data.y;
             playerObject.angle = json.data.angle;
 
-            for (var [connection, gameObject] of clientMap.entries()) {
-                if (connection !== this) {
+            for (var [connection, gameObject] of clientMap.entries())
+			{
+                if (connection != this)
+				{
                     connection.send(
                         JSON.stringify({ type: 'updatePlayer', data: playerObject.getJson()} ));
                 }
             }
         }
-        else if (json.type == 'addProjectile') {
+        else if (json.type == 'addProjectile')
+		{
             var projectileId = projectileNum++;
             // Notify all clients of a new projectile
-            for (var [connection, gameObject] of clientMap.entries()) {
+            for (var [connection, gameObject] of clientMap.entries())
+			{
                 connection.send(
                     JSON.stringify({ type: 'addProjectile', data: {
                         id: projectileId,
@@ -194,10 +209,14 @@ wsServer.on('request', function(request) {
         }
         // Mimic each of these messages to all clients
         else if (json.type == 'removeProjectile' || json.type == 'removePlayer' ||
-            json.type == 'disablePlayer' || json.type == 'enablePlayer' ||
-            json.type == 'addDetonation') {
-            for (var [connection, gameObject] of clientMap.entries()) {
-                connection.send(JSON.stringify(json));
+			json.type == 'playerEnabled' || json.type == 'addDetonation')
+		{
+            for (var [connection, gameObject] of clientMap.entries())
+			{
+				if (connection != this)
+				{
+					connection.send(JSON.stringify(json));
+				}
             }
         }
     });
@@ -212,7 +231,7 @@ wsServer.on('request', function(request) {
 
         for (var [connection, gameObject] of clientMap.entries()) {
             connection.send(
-                JSON.stringify({ type: 'removePlayer', data: deletedId}));
+                JSON.stringify({ type: 'removePlayer', data: {id: deletedId}}));
         }
     });
 });

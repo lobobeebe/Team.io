@@ -8,6 +8,8 @@ function Projectile(x, y, angle, team, gameArea)
     this.isActive = true;
     this.shooterId = -1;
     this.type = "None";
+	
+	this.shape = null;
 }
 
 Projectile.prototype =
@@ -39,6 +41,8 @@ Projectile.prototype =
         {
             this.x += this.speed * Math.cos(this.angle);
             this.y += this.speed * Math.sin(this.angle);
+			
+			this.shape.update(this.x, this.y, this.angle);
         }
     }
 }
@@ -47,28 +51,26 @@ function Bomb(x, y, angle, team, gameArea)
 {
     Projectile.call(this, x, y, angle, team, gameArea);
     this.speed = 0;
-    this.blastRadius = 100;
-    this.radius = 15;
     this.type = "Bomb";
+	this.detonation = new Circle(100);
+	this.shape = new Circle(15);
+	
+	this.shape.update(this.x, this.y, this.angle);
+	this.detonation.update(this.x, this.y, this.angle);
 
     this.deactivate = function()
     {
-        // When bombs are deactivated, they explode.
-        // Determine if main player is affected by explosion.
-        var blastRadiusSquared = this.blastRadius * this.blastRadius;
-
-        if (this.gameArea.mainPlayer.squaredDistanceFrom(this.x, this.y) <= blastRadiusSquared)
-        {
+		if (this.gameArea.mainPlayer && this.gameArea.mainPlayer.isProjectileOpponent(this) &&
+			this.gameArea.mainPlayer.intersects(this.detonation))
+		{
             this.gameArea.mainPlayer.hit(this);
-        }
-
-        Projectile.prototype.deactivate.call(this);
-    }
+		}
+	}
 
     this.draw = function()
     {
         // Only draw Bomb if the mainPlayer is on the same team.
-        if (!this.gameArea.mainPlayer.isProjectileOpponent(this))
+        if (this.gameArea.mainPlayer && !this.gameArea.mainPlayer.isProjectileOpponent(this))
         {
             Projectile.prototype.draw.call(this);
         }
@@ -78,9 +80,19 @@ function Bomb(x, y, angle, team, gameArea)
     {
         ctx.fillStyle = "Black";
         ctx.beginPath();
-        ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+        ctx.arc(0, 0, this.shape.radius, 0, Math.PI * 2);
         ctx.fill();
+		ctx.beginPath();
+		ctx.arc(0, 0, this.detonation.radius, 0, Math.PI * 2);
+		ctx.stroke();
     }
+	
+	this.update = function()
+	{
+		Projectile.prototype.update.call(this);
+		
+		this.detonation.update(this.x, this.y, this.angle);
+	}
 }
 Bomb.prototype = new Projectile();
 
@@ -91,32 +103,33 @@ function Bullet(x, y, angle, team, gameArea)
     this.speed = 10;
     this.width = 10;
     this.type = "Bullet";
+	this.shape = new Rectangle(5, 2.5);
 
     this.innerDraw = function()
     {
         ctx.fillStyle = "Black";
-        ctx.fillRect(-this.width, -this.height / 2, this.width, this.height);
+        ctx.fillRect(-this.width / 2, -this.height / 2, this.width, this.height);
     }
 }
 Bullet.prototype = new Projectile();
 
-function createProjectile(json, gameArea)
+function createProjectile(type, x, y, angle, team, shooterId, gameArea)
 {
-    var projectile = null;
+    let projectile = null;
 
-    switch (json.type)
+    switch (type)
     {
         case "Bomb":
-            projectile = new Bomb(json.x, json.y, json.angle, json.team, gameArea);
+            projectile = new Bomb(x, y, angle, team, gameArea);
             break;
 
         case "Bullet":
-            projectile = new Bullet(json.x, json.y, json.angle, json.team, gameArea);
         default:
+            projectile = new Bullet(x, y, angle, team, gameArea);
             break;
     }
 
-    projectile.shooterId = json.shooterId;
+    projectile.shooterId = shooterId;
 
     return projectile;
 }

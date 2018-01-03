@@ -1,5 +1,5 @@
 function GameArea(connection)
-{
+{	
     this.canvas = document.getElementById("gameArea");
     this.connection = connection;
     this.mainPlayer = new TrianglePlayer(this);
@@ -16,7 +16,46 @@ function GameArea(connection)
     this.canvas.width = window.innerWidth;
     this.canvas.height = window.innerHeight;
     this.context = this.canvas.getContext("2d");
+	
+	this.poly = new Polygon();
+	this.poly.points =
+	[
+		{x: this.canvas.width - 150, y: 100},
+		{x: this.canvas.width - 150, y: 200},
+		{x: this.canvas.width - 50, y: 200},
+		{x: this.canvas.width - 50, y: 100}
+	]
 
+	this.mousePoly = new Polygon();
+	this.mousePoly.points =
+	[
+		{x: 0, y: 0},
+		{x: 0, y: 0},
+		{x: 0, y: 0},
+		{x: 0, y: 0}
+	]
+	
+	this.addProjectile = function(id, type, x, y, angle, team, shooterId, fromLocal)
+	{		
+		if (fromLocal)
+		{
+			this.connection.send(
+				JSON.stringify({ type: 'addProjectile', data:
+				{type: type, x: x, y: y, angle: angle, team: team, shooterId: shooterId}}));
+		}
+		else
+		{
+			var newProjectile = createProjectile(type, x, y, angle, team, shooterId, this);
+			this.projectiles.set(id, newProjectile);
+			
+			// If this projectile was added by the main player, set the projectile to the player's last projectile
+			if (this.mainPlayer && newProjectile.shooterId == this.mainPlayer.id)
+			{
+				this.mainPlayer.lastProjectile = id;
+			}
+		}
+	}
+	
     this.drawBackground = function()
     {
         this.context.save();
@@ -53,10 +92,66 @@ function GameArea(connection)
             miniMapY - miniMapHalfHeight, miniMapHalfWidth * 2, miniMapHalfHeight * 2);
         this.context.stroke();
 
-        this.context.fillRect(miniMapX + this.mainPlayer.x * .05,
-            miniMapY + this.mainPlayer.y * .05, 2, 2);
+		// Draw Main Player
+		if (this.mainPlayer)
+		{
+			this.context.fillRect(miniMapX + this.mainPlayer.x * .05,
+				miniMapY + this.mainPlayer.y * .05, 2, 2);	
+		}
         this.context.restore();
     }
+	
+	this.joinGame = function()
+	{
+		this.connection.send(JSON.stringify({ type: 'joinRequest' }));
+	}
+	
+	this.removePlayer = function(playerId, fromLocal)
+	{
+        this.players.delete(playerId);
+	
+		if (fromLocal)
+		{
+			this.connection.send(JSON.stringify({ type: 'removePlayer', data: {id: playerId}}));
+			
+			if (this.mainPlayer && playerId == this.mainPlayer.id)
+			{
+				this.mainPlayer = null;
+			}
+		}
+	}
+	
+	this.removeProjectile = function(projectileId, fromLocal)
+	{
+		let projectile = this.projectiles.get(projectileId);
+		if (projectile)
+        {
+			projectile.deactivate();
+		}
+		
+        this.projectiles.delete(projectileId);
+		
+		if (fromLocal)
+		{
+			this.connection.send(JSON.stringify({ type: 'removeProjectile', data: {id: projectileId}}));
+		}
+	}
+	
+	this.setPlayerIsEnabled = function(playerId, isEnabled, fromLocal)
+	{
+		let player = this.players.get(playerId);
+		
+		if (player)
+		{
+			player.isEnabled = isEnabled;	
+		}
+		
+		if (fromLocal)
+		{
+			this.connection.send(JSON.stringify(
+			{ type: 'playerEnabled', data: {id: playerId, isEnabled: isEnabled}}));
+		}
+	}
 
     this.stop = function()
     {
@@ -69,26 +164,29 @@ function GameArea(connection)
         this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
         // Process Inputs
-        this.mainPlayer.processInput(this.keys, this.mouseX - this.x, this.mouseY - this.y);
+		if (this.mainPlayer)
+		{
+			this.mainPlayer.processInput(this.keys, this.mouseX - this.x, this.mouseY - this.y);	
+		}
 
         // Update Camera
         this.updateCamera();
 
         // Before drawing any items, translate the context to the GameArea's location
-        this.context.save();
+        this.context.save();  
         this.context.translate(this.x, this.y);
 
         // Draw background
         this.drawBackground();
 
         // Update Flags
-        for (var [id, flag] of this.flags)
+        for (let [id, flag] of this.flags)
         {
             flag.draw();
         }
 
         // Update Projectiles
-        for (var [id, projectile] of this.projectiles)
+        for (let [id, projectile] of this.projectiles)
         {
             if (projectile.isActive)
             {
@@ -96,20 +194,15 @@ function GameArea(connection)
                 projectile.draw();
 
                 // Check if any Projectiles hit this player
-                if (projectile.shooterId != this.mainPlayer.id &&
-                    this.mainPlayer.doesProjectileHit(projectile))
+				console.log(projectile.shooterId);
+				console.log(this.mainPlayer.id);
+                if (this.mainPlayer && this.mainPlayer.isProjectileOpponent(projectile) &&
+                    this.mainPlayer.intersects(projectile.shape))
                 {
                     this.mainPlayer.hit(projectile);
 
                     // Projectile has hit player. Remove it.
-                    this.connection.send(JSON.stringify(
-                    {
-                        type: 'removeProjectile',
-                        data:
-                        {
-                            id: id
-                        }
-                    }));
+					this.removeProjectile(id, true);
                 }
             }
             else
@@ -119,12 +212,15 @@ function GameArea(connection)
         }
 
         // Update Players
-        for (var [id, player] of this.players)
+        for (let [id, player] of this.players)
         {
             player.update();
             player.draw();
-
-            player.interactWith(this.mainPlayer);
+			
+			if (this.mainPlayer)
+			{
+				player.interactWith(this.mainPlayer);
+			}
         }
 
         // Done drawing, restore overall state
@@ -132,18 +228,45 @@ function GameArea(connection)
 
         // Draw Mini Map
         this.drawMiniMap();
-
+	
         // Send player update information.
         // TODO: Consider reducing frequency of this update rate
-        this.connection.send(JSON.stringify({ type: 'updatePlayer', data: this.mainPlayer.getJson()}));
+		if (this.mainPlayer)
+		{
+			this.updatePlayer(this.mainPlayer.id, this.mainPlayer.x, this.mainPlayer.y,
+				this.mainPlayer.angle, this.mainPlayer.team, true);
+		}
 
         ++this.frameNo;
     }
+	
+	this.updatePlayer = function(playerId, x, y, angle, team, fromLocal)
+	{
+		if (fromLocal)
+		{
+			this.connection.send(JSON.stringify({ type: 'updatePlayer', data:
+			{id: playerId, x: x, y: y, angle: angle, team: team, fromLocal}}));
+		}
+		else
+		{
+			let updatedPlayer = this.players.get(playerId);
+			if (updatedPlayer)
+			{
+				updatedPlayer.x = x;
+				updatedPlayer.y = y;
+				updatedPlayer.angle = angle;
+				updatedPlayer.team = team;
+			}
+		}
+	}
 
     this.updateCamera = function()
     {
-        this.x = (this.canvas.width / 2) - this.mainPlayer.x;
-        this.y = (this.canvas.height / 2) - this.mainPlayer.y;
+		if (this.mainPlayer)
+		{
+			this.x = (this.canvas.width / 2) - this.mainPlayer.x;
+			this.y = (this.canvas.height / 2) - this.mainPlayer.y;	
+		}
     }
 
     this.reset = function ()
