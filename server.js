@@ -3,7 +3,7 @@
 process.title = 'team.io';
 // Port where we'll run the websocket server
 var webSocketsServerPort = 8082;
-var htmlServerPort = 8081;
+var htmlServerPort = 80;
 // websocket and http servers
 const webSocketServer = require('websocket').server;
 const http = require('http');
