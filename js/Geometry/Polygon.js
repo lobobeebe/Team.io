@@ -1,12 +1,26 @@
-function Polygon()
+function Polygon(localPoints)
 {
     // Initialize member variables
 	Shape.call(this);
+	
+	this.localPoints = localPoints;
+	this.points = localPoints;
 	
 	this.type = "Polygon";
 }
 
 Polygon.prototype = new Shape();
+
+Polygon.prototype.draw = function(context)
+{
+	context.beginPath();
+	context.moveTo(this.points[0].x, this.points[0].y);
+	for (let i = 0; i < this.points.length; ++i)
+	{
+		context.lineTo(this.points[i].x, this.points[i].y)
+	}
+	context.closePath();
+}
 
 /**
  * Function to determine if a point intersects this Polygon.
@@ -46,4 +60,22 @@ Polygon.prototype.intersectsEdges = function(shape)
 	}
 
 	return false;
+}
+
+Polygon.prototype.update = function(x, y, angle)
+{
+	Shape.prototype.update.call(this, x, y, angle);
+	
+	let points = [];
+	
+	for (let i = 0; i < this.localPoints.length; ++i)
+	{
+		let point = getRotatedCoordinates(this.localPoints[i].x, this.localPoints[i].y, angle);
+		point.x += x;
+		point.y += y;
+		
+		points.push(point);
+	}
+	
+	this.points = points;
 }

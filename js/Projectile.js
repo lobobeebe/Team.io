@@ -20,20 +20,9 @@ Projectile.prototype =
     },
     draw: function()
     {
-        ctx = this.gameArea.context;
-        ctx.save();
-        ctx.translate(this.x, this.y);
-        ctx.rotate(this.angle);
-
-        ctx.save();
-        this.innerDraw(ctx);
-        ctx.restore();
-
-        ctx.restore();
-    },
-    innerDraw: function(ctx)
-    {
-        /* No implementation at base */
+		let context = this.gameArea.context;
+		this.shape.draw(context);
+		context.fill();
     },
     update: function()
     {
@@ -63,6 +52,7 @@ function Bomb(x, y, angle, team, gameArea)
 		if (this.gameArea.mainPlayer && this.gameArea.mainPlayer.isProjectileOpponent(this) &&
 			this.gameArea.mainPlayer.intersects(this.detonation))
 		{
+			console.log("Hello");
             this.gameArea.mainPlayer.hit(this);
 		}
 	}
@@ -72,19 +62,16 @@ function Bomb(x, y, angle, team, gameArea)
         // Only draw Bomb if the mainPlayer is on the same team.
         if (this.gameArea.mainPlayer && !this.gameArea.mainPlayer.isProjectileOpponent(this))
         {
-            Projectile.prototype.draw.call(this);
+			Projectile.prototype.draw.call(this);
+			
+			let context = this.gameArea.context;
+			
+			context.save();
+			context.setLineDash([15,15]);
+			this.detonation.draw(context);
+			context.stroke();
+			context.restore();
         }
-    }
-
-    this.innerDraw = function()
-    {
-        ctx.fillStyle = "Black";
-        ctx.beginPath();
-        ctx.arc(0, 0, this.shape.radius, 0, Math.PI * 2);
-        ctx.fill();
-		ctx.beginPath();
-		ctx.arc(0, 0, this.detonation.radius, 0, Math.PI * 2);
-		ctx.stroke();
     }
 	
 	this.update = function()
@@ -103,13 +90,7 @@ function Bullet(x, y, angle, team, gameArea)
     this.speed = 10;
     this.width = 10;
     this.type = "Bullet";
-	this.shape = new Rectangle(5, 2.5);
-
-    this.innerDraw = function()
-    {
-        ctx.fillStyle = "Black";
-        ctx.fillRect(-this.width / 2, -this.height / 2, this.width, this.height);
-    }
+	this.shape = new Rectangle(5, 5);
 }
 Bullet.prototype = new Projectile();
 

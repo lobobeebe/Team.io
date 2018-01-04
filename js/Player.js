@@ -12,7 +12,12 @@ function Player(gameArea)
     this.lastProjectile = -1;
     this.maxAngularSpeed = 3;
     this.maxSpeed = 5;
-    this.rect = new Rectangle(25, 25);
+    this.rect = new Polygon([
+		{x: 0, y: 25},
+		{x: -25, y: 25},
+		{x: -25, y: -25},
+		{x: 0, y: -25}
+		]);
     this.angularSpeed = .05;
     this.speed = [0, 0];
     this.team = "White";
@@ -39,32 +44,12 @@ Player.prototype =
     },
     draw: function()
     {
-        ctx = this.gameArea.context;
-
-        ctx.save();
-        ctx.translate(this.x, this.y);
-        ctx.rotate(this.angle);
-
-        ctx.save();
-        this.innerDraw(ctx);
-        ctx.restore();
-
-        ctx.restore();
-
-        // TODO: Should only be done in debug
-        //this.drawHitBox();
-    },
-    drawHitBox: function()
-    {
-        // Draw hitbox
-        ctx.strokeStyle = 'Black';
-        ctx.beginPath();
-        ctx.moveTo(this.rect.tl.x, this.rect.tl.y);
-        ctx.lineTo(this.rect.tr.x, this.rect.tr.y);
-        ctx.lineTo(this.rect.br.x, this.rect.br.y);
-        ctx.lineTo(this.rect.bl.x, this.rect.bl.y);
-        ctx.lineTo(this.rect.tl.x, this.rect.tl.y);
-        ctx.stroke();
+        let context = this.gameArea.context;
+		let colors = this.getColors();
+		
+		context.fillStyle = colors.primary;
+		this.rect.draw(context);
+		context.fill();
     },
     reEnable: function()
     {
@@ -72,57 +57,50 @@ Player.prototype =
     },
     getColors: function()
     {
-        var colors = [];
         switch (this.team)
         {
             case "Blue":
-                colors.push("Blue");
                 if (this.isEnabled)
                 {
-                     colors.push("DarkBlue");
+					return {primary: "Blue", secondary: "DarkBlue"};
                 }
                 else
                 {
-                    colors.push("Blue");
+					return {primary: "Blue", secondary: "Blue"};
                 }
 				break;
             case "Green":
-                colors.push("Green");
                 if (this.isEnabled)
                 {
-                     colors.push("DarkGreen");
+					return {primary: "Green", secondary: "DarkGreen"};
                 }
                 else
                 {
-                    colors.push("Green");
+					return {primary: "Green", secondary: "Green"};
                 }
 				break;
             case "Red":
-                colors.push("Red");
                 if (this.isEnabled)
                 {
-                     colors.push("DarkRed");
+					return {primary: "Red", secondary: "DarkRed"};
                 }
                 else
                 {
-                    colors.push("Red");
+					return {primary: "Red", secondary: "Red"};
                 }
 				break;
             case "White":
             default:
-                colors.push("White");
                 if (this.isEnabled)
                 {
-                     colors.push("Gray");
+					return {primary: "White", secondary: "Gray"};
                 }
                 else
                 {
-                    colors.push("White");
+					return {primary: "White", secondary: "White"};
                 }
 				break;
         }
-
-        return colors;
     },
     getJson: function()
     {
@@ -193,24 +171,30 @@ Player.prototype =
     processInput: function(keys, mouseX, mouseY)
     {
         this.speed = [0, 0];
+		
+		let maxSpeed = this.maxSpeed;
+		if (!this.isEnabled)
+		{
+			maxSpeed *= .75;
+		}
 
         if (keys)
         {
             if (keys[87])
             { /* W: Move forward */
-                this.speed[1] = this.maxSpeed;
+                this.speed[1] = maxSpeed;
             }
             if (keys[83])
             { /* S: Move backward */
-                this.speed[1] = -this.maxSpeed;
+                this.speed[1] = -maxSpeed;
             }
             if (keys[65])
             { /* A: Strafe left */
-                this.speed[0] = this.maxSpeed;
+                this.speed[0] = maxSpeed;
             }
             if (keys[68])
             { /* D: Strafe right */
-                this.speed[0] = -this.maxSpeed;
+                this.speed[0] = -maxSpeed;
             }
 
             /* Space: Activate Ability */
@@ -257,6 +241,7 @@ Player.prototype =
     {
         let cosAngle = Math.cos(this.angle);
         let sinAngle = Math.sin(this.angle);
+		
         this.x = clamp(this.x + (this.speed[1] * cosAngle) + (this.speed[0] * sinAngle),
             this.gameArea.bounds.x - this.gameArea.bounds.halfWidth, this.gameArea.bounds.x + this.gameArea.bounds.halfWidth);
         this.y = clamp(this.y + (this.speed[1] * sinAngle) - (this.speed[0] * cosAngle),
@@ -271,24 +256,30 @@ function CirclePlayer(gameArea)
     Player.call(this, gameArea);
     this.type = "Sneak";
 	this.activationCooldown = 75;
+	
+	this.front = new Circle(25);
 
     this.activateAbility = function()
     {
 		this.gameArea.addProjectile(-1, "Bomb", this.x, this.y, this.angle, this.team, this.id, true);
     }
-
-    this.innerDraw = function(ctx)
-    {
-        var colors = Player.prototype.getColors.call(this);
-        ctx.fillStyle = colors[0];
-        ctx.fillRect(-this.rect.halfWidth, -this.rect.halfHeight, this.rect.halfWidth, this.rect.halfHeight * 2);
-
-        ctx.fillStyle = colors[1];
-        ctx.beginPath();
-        ctx.arc(0, 0, this.rect.halfWidth, -Math.PI / 2, Math.PI / 2);
-        ctx.closePath();
-        ctx.fill();
-    }
+	
+	this.draw = function()
+	{
+		let context = this.gameArea.context;
+		let colors = this.getColors();
+		
+		context.fillStyle = colors.secondary;
+		this.front.draw(context);
+		context.fill();
+		
+		Player.prototype.draw.call(this);
+	}
+	
+	this.intersects = function(shape)
+	{
+		return Player.prototype.intersects.call(this, shape) || this.front.intersects(shape);
+	}
 
     this.tryActivateAbility = function()
     {
@@ -308,6 +299,12 @@ function CirclePlayer(gameArea)
             }
         }
     }
+	
+	this.update = function()
+	{
+		Player.prototype.update.call(this);
+		this.front.update(this.x, this.y, this.angle);
+	}
 }
 CirclePlayer.prototype = new Player();
 
@@ -315,27 +312,41 @@ function TrianglePlayer(gameArea)
 {
     Player.call(this, gameArea);
     this.type = "Shooter";
+	
+	this.front = new Polygon([
+		{x: 0, y:25},
+		{x: 25, y: 0},
+		{x:0, y: -25}
+	]);
 
     this.activateAbility = function()
 	{
-		gameArea.addProjectile(-1, "Bullet", this.x + this.rect.halfHeight * Math.cos(this.angle),
-			this.y + this.rect.halfHeight * Math.sin(this.angle), this.angle, this.team, this.id, true);
+		gameArea.addProjectile(-1, "Bullet", this.x + 25 * Math.cos(this.angle),
+			this.y + 25 * Math.sin(this.angle), this.angle, this.team, this.id, true);
     }
-
-    this.innerDraw = function(ctx)
-    {
-        var colors = this.getColors();
-        ctx.fillStyle = colors[0];
-        ctx.fillRect(-this.rect.halfWidth, -this.rect.halfHeight, this.rect.halfWidth, this.rect.halfHeight * 2);
-
-        ctx.fillStyle = colors[1];
-        ctx.beginPath();
-        ctx.moveTo(0, -this.rect.halfHeight);
-        ctx.lineTo(this.rect.halfWidth, 0);
-        ctx.lineTo(0, this.rect.halfHeight);
-        ctx.closePath();
-        ctx.fill();
-    }
+	
+	this.draw = function()
+	{
+		let context = this.gameArea.context;
+		let colors = this.getColors();
+		
+		context.fillStyle = colors.secondary;
+		this.front.draw(context);
+		context.fill();
+		
+		Player.prototype.draw.call(this);
+	}
+	
+	this.intersects = function(shape)
+	{
+		return Player.prototype.intersects.call(this, shape) || this.front.intersects(shape);
+	}
+	
+	this.update = function()
+	{
+		Player.prototype.update.call(this);
+		this.front.update(this.x, this.y, this.angle);
+	}
 }
 TrianglePlayer.prototype = new Player();
 
@@ -343,72 +354,31 @@ function SquarePlayer(gameArea)
 {
     Player.call(this, gameArea);
     this.type = "Shield";
-    this.shieldRect = new Rectangle(this.rect.halfWidth / 2, this.rect.halfHeight);
-
-    this.drawHitBox = function()
-    {
-        Player.prototype.drawHitBox.call(this);
-
-        // Draw shield hitbox
-        ctx.strokeStyle = 'Red';
-        ctx.beginPath();
-        ctx.moveTo(this.shieldRect.tl.x, this.shieldRect.tl.y);
-        ctx.lineTo(this.shieldRect.tr.x, this.shieldRect.tr.y);
-        ctx.lineTo(this.shieldRect.br.x, this.shieldRect.br.y);
-        ctx.lineTo(this.shieldRect.bl.x, this.shieldRect.bl.y);
-        ctx.lineTo(this.shieldRect.tl.x, this.shieldRect.tl.y);
-        ctx.stroke();
-    }
-
+    this.shieldRect = new Polygon([
+		{x: 0, y: 25},
+		{x: 0, y: -25},
+		{x: 25, y: -25},
+		{x: 25, y: 25}
+		]);
+		
 	this.draw = function()
 	{
-        let ctx = this.gameArea.context;
+		Player.prototype.draw.call(this);
 		
-		var colors = this.getColors();
+		let context = this.gameArea.context;
+		let colors = this.getColors();
 		
-		// Draw base
-		ctx.beginPath();
-		ctx.moveTo(this.rect.points[0].x, this.rect.points[0].y);
-		for (let i = 1; i < this.rect.points.length; ++i)
-		{
-			ctx.lineTo(this.rect.points[i].x, this.rect.points[i].y);
-		}
-		ctx.closePath();
-		ctx.fillStyle = colors[0];
-		ctx.fill();
-		
-		// Draw Shield
-		ctx.beginPath();
-		ctx.moveTo(this.shieldRect.points[0].x, this.shieldRect.points[0].y);
-		for (let i = 1; i < this.shieldRect.points.length; ++i)
-		{
-			ctx.lineTo(this.shieldRect.points[i].x, this.shieldRect.points[i].y);
-		}
-		ctx.closePath();
-		ctx.fillStyle = colors[1];
-		ctx.fill();
+		context.fillStyle = colors.secondary;
+		this.shieldRect.draw(context);
+		context.fill();
 	}
 	
-    this.innerDraw = function(ctx)
-    {
-        // Get Colors
-        var colors = this.getColors();
-
-        // Draw Back
-        ctx.fillStyle = colors[0];
-        ctx.fillRect(-this.rect.halfWidth, -this.rect.halfHeight, this.rect.halfWidth, this.rect.halfHeight * 2);
-
-        // Draw Shield
-        ctx.fillStyle = colors[1];
-        ctx.fillRect(0, -this.shieldRect.halfHeight, this.shieldRect.halfWidth * 2, this.shieldRect.halfHeight * 2);
-    }
-
     this.hit = function(projectile)
     {
         // Bullets are blocked by the shield
         if (projectile.type == "Bullet")
         {
-            if (!this.shieldRect.intersectsPoint(projectile.x, projectile.y))
+            if (!this.isEnabled || !this.shieldRect.intersects(projectile.shape))
             {
                 Player.prototype.hit.call(this, projectile);
             }
@@ -418,6 +388,11 @@ function SquarePlayer(gameArea)
             Player.prototype.hit.call(this, projectile);
         }
     }
+	
+	this.intersects = function(shape)
+	{
+		return Player.prototype.intersects.call(this, shape) || this.shieldRect.intersects(shape);
+	}
 
     /**
      * Overriding to destroy players who touch the shield
@@ -426,7 +401,7 @@ function SquarePlayer(gameArea)
     {
         if (this.isPlayerOpponent(player) && this.isEnabled)
         {
-            if (this.shieldRect.intersects(player.rect))
+            if (player.intersects(this.shieldRect))
             {
 				player.kill();
             }
@@ -439,12 +414,7 @@ function SquarePlayer(gameArea)
         Player.prototype.update.call(this);
 
         // Update shield location
-        let cosAngle = Math.cos(this.angle);
-        let sinAngle = Math.sin(this.angle);
-
-        this.shieldRect.update(this.x + (this.shieldRect.halfWidth * cosAngle),
-            this.y + (this.shieldRect.halfWidth * sinAngle),
-            this.angle);
+        this.shieldRect.update(this.x, this.y, this.angle);
     }
 }
 SquarePlayer.prototype = new Player();

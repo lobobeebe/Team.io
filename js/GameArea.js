@@ -169,9 +169,6 @@ function GameArea(connection)
 			this.mainPlayer.processInput(this.keys, this.mouseX - this.x, this.mouseY - this.y);	
 		}
 
-        // Update Camera
-        this.updateCamera();
-
         // Before drawing any items, translate the context to the GameArea's location
         this.context.save();  
         this.context.translate(this.x, this.y);
@@ -188,27 +185,18 @@ function GameArea(connection)
         // Update Projectiles
         for (let [id, projectile] of this.projectiles)
         {
-            if (projectile.isActive)
-            {
-                projectile.update();
-                projectile.draw();
+			projectile.update();
+			projectile.draw();
 
-                // Check if any Projectiles hit this player
-				console.log(projectile.shooterId);
-				console.log(this.mainPlayer.id);
-                if (this.mainPlayer && this.mainPlayer.isProjectileOpponent(projectile) &&
-                    this.mainPlayer.intersects(projectile.shape))
-                {
-                    this.mainPlayer.hit(projectile);
+			// Check if any Projectiles hit this player
+			if (this.mainPlayer && this.mainPlayer.isProjectileOpponent(projectile) &&
+				this.mainPlayer.intersects(projectile.shape))
+			{
+				this.mainPlayer.hit(projectile);
 
-                    // Projectile has hit player. Remove it.
-					this.removeProjectile(id, true);
-                }
-            }
-            else
-            {
-                this.projectiles.delete(id);
-            }
+				// Projectile has hit player. Remove it.
+				this.removeProjectile(id, true);
+			}
         }
 
         // Update Players
@@ -236,6 +224,9 @@ function GameArea(connection)
 			this.updatePlayer(this.mainPlayer.id, this.mainPlayer.x, this.mainPlayer.y,
 				this.mainPlayer.angle, this.mainPlayer.team, true);
 		}
+
+        // Update Camera
+        this.updateCamera();
 
         ++this.frameNo;
     }

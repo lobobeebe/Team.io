@@ -191,9 +191,9 @@ wsServer.on('request', function(request)
         }
         else if (json.type == 'addProjectile')
 		{
-            var projectileId = projectileNum++;
+            let projectileId = projectileNum++;
             // Notify all clients of a new projectile
-            for (var [connection, gameObject] of clientMap.entries())
+            for (let [connection, gameObject] of clientMap.entries())
 			{
                 connection.send(
                     JSON.stringify({ type: 'addProjectile', data: {
