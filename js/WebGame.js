@@ -12,7 +12,7 @@ if (!window.WebSocket)
 }
 
 // open connection
-var connection = new WebSocket('ws://18.218.91.218:8082');
+var connection = new WebSocket('ws://18.218.90.135:8082');
 //var connection = new WebSocket('ws://localhost:8082');
 
 var gameArea = new GameArea(connection);
