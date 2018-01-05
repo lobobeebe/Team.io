@@ -52,7 +52,6 @@ function Bomb(x, y, angle, team, gameArea)
 		if (this.gameArea.mainPlayer && this.gameArea.mainPlayer.isProjectileOpponent(this) &&
 			this.gameArea.mainPlayer.intersects(this.detonation))
 		{
-			console.log("Hello");
             this.gameArea.mainPlayer.hit(this);
 		}
 	}

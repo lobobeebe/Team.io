@@ -19,7 +19,7 @@ function Player(gameArea)
 		{x: 0, y: -25}
 		]);
     this.angularSpeed = .05;
-    this.speed = [0, 0];
+    this.speed = {x: 0, y: 0};
     this.team = "White";
     this.type = "None";
     this.x = 255;
@@ -170,7 +170,7 @@ Player.prototype =
 	},
     processInput: function(keys, mouseX, mouseY)
     {
-        this.speed = [0, 0];
+		this.speed = {x: 0, y: 0};
 		
 		let maxSpeed = this.maxSpeed;
 		if (!this.isEnabled)
@@ -182,19 +182,19 @@ Player.prototype =
         {
             if (keys[87])
             { /* W: Move forward */
-                this.speed[1] = maxSpeed;
+                this.speed.y = -maxSpeed;
             }
             if (keys[83])
             { /* S: Move backward */
-                this.speed[1] = -maxSpeed;
+                this.speed.y = maxSpeed;
             }
             if (keys[65])
             { /* A: Strafe left */
-                this.speed[0] = maxSpeed;
+                this.speed.x = -maxSpeed;
             }
             if (keys[68])
             { /* D: Strafe right */
-                this.speed[0] = -maxSpeed;
+                this.speed.x = maxSpeed;
             }
 
             /* Space: Activate Ability */
@@ -239,13 +239,24 @@ Player.prototype =
     },
     update: function()
     {
+		
         let cosAngle = Math.cos(this.angle);
         let sinAngle = Math.sin(this.angle);
 		
-        this.x = clamp(this.x + (this.speed[1] * cosAngle) + (this.speed[0] * sinAngle),
-            this.gameArea.bounds.x - this.gameArea.bounds.halfWidth, this.gameArea.bounds.x + this.gameArea.bounds.halfWidth);
-        this.y = clamp(this.y + (this.speed[1] * sinAngle) - (this.speed[0] * cosAngle),
-            this.gameArea.bounds.y - this.gameArea.bounds.halfHeight, this.gameArea.bounds.y + this.gameArea.bounds.halfHeight);
+		/*
+		// Move towards mouse
+        let nextX = this.x + (this.speed.y * cosAngle) + (this.speed.x * sinAngle);
+        let nextY = this.y + (this.speed.y * sinAngle) - (this.speed.x * cosAngle);
+		*/
+		
+		// Simple directional movement
+		let nextX = this.x + this.speed.x;
+		let nextY = this.y + this.speed.y;
+			
+		this.x = clamp(nextX, this.gameArea.bounds.x - this.gameArea.bounds.halfWidth,
+			this.gameArea.bounds.x + this.gameArea.bounds.halfWidth);
+		this.y = clamp(nextY, this.gameArea.bounds.y - this.gameArea.bounds.halfHeight,
+			this.gameArea.bounds.y + this.gameArea.bounds.halfHeight);
 
         this.rect.update(this.x, this.y, this.angle);
     }

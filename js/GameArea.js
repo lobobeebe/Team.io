@@ -45,7 +45,7 @@ function GameArea(connection)
 		}
 		else
 		{
-			var newProjectile = createProjectile(type, x, y, angle, team, shooterId, this);
+			let newProjectile = createProjectile(type, x, y, angle, team, shooterId, this);
 			this.projectiles.set(id, newProjectile);
 			
 			// If this projectile was added by the main player, set the projectile to the player's last projectile
@@ -118,6 +118,21 @@ function GameArea(connection)
 			{
 				this.mainPlayer = null;
 			}
+		}
+		
+		// Remove all projectiles that were shot by the remove player
+		let projectileIds = [];
+		for (let [id, projectile] of this.projectiles)
+		{
+			if (projectile.shooterId == playerId)
+			{
+				projectileIds.push(id);
+			}
+		}
+		
+		for (let id of projectileIds)
+		{
+			this.removeProjectile(id, false);
 		}
 	}
 	
