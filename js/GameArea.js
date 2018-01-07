@@ -223,12 +223,14 @@ function GameArea(connection)
 		for (let [id, flag] of this.flags)
 		{
 			flag.draw();
-			
+			/*
+			TODO: Intersect on flag does not work
 			if (this.mainPlayer && this.mainPlayer.team == "White" &&
 				this.mainPlayer.intersects(flag))
 			{
 				this.joinTeam(flag.ownerId);
 			}
+			*/
 		}
 
         // Done drawing, restore overall state
