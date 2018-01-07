@@ -211,7 +211,7 @@ Player.prototype =
             // E: Drop Flag
             if (keys[69])
             {
-                this.gameArea.flags.set(0, new Flag(this.team, this.id, this.x, this.y, this.gameArea));
+                this.gameArea.addFlag(this.id, this.x, this.y, true);
             }
         }
 

@@ -17,23 +17,22 @@ function GameArea(connection)
     this.canvas.height = window.innerHeight;
     this.context = this.canvas.getContext("2d");
 	
-	this.poly = new Polygon();
-	this.poly.points =
-	[
-		{x: this.canvas.width - 150, y: 100},
-		{x: this.canvas.width - 150, y: 200},
-		{x: this.canvas.width - 50, y: 200},
-		{x: this.canvas.width - 50, y: 100}
-	]
-
-	this.mousePoly = new Polygon();
-	this.mousePoly.points =
-	[
-		{x: 0, y: 0},
-		{x: 0, y: 0},
-		{x: 0, y: 0},
-		{x: 0, y: 0}
-	]
+	this.addFlag = function(ownerId, x, y, fromLocal)
+	{
+		if (fromLocal)
+		{
+			this.connection.send(JSON.stringify({type: 'addFlag', data: {ownerId: ownerId, x: x, y: y}}));
+		}
+		else
+		{
+			let owner = this.players.get(ownerId);
+			if (owner)
+			{
+				let newFlag = new Flag(owner.team, ownerId, x, y, this);
+				this.flags.set(ownerId, newFlag);
+			}
+		}
+	}
 	
 	this.addProjectile = function(id, type, x, y, angle, team, shooterId, fromLocal)
 	{		
@@ -191,12 +190,6 @@ function GameArea(connection)
         // Draw background
         this.drawBackground();
 
-        // Update Flags
-        for (let [id, flag] of this.flags)
-        {
-            flag.draw();
-        }
-
         // Update Projectiles
         for (let [id, projectile] of this.projectiles)
         {
@@ -225,6 +218,18 @@ function GameArea(connection)
 				player.interactWith(this.mainPlayer);
 			}
         }
+		
+		// Update Flags
+		for (let [id, flag] of this.flags)
+		{
+			flag.draw();
+			
+			if (this.mainPlayer && this.mainPlayer.team == "White" &&
+				this.mainPlayer.intersects(flag))
+			{
+				this.joinTeam(flag.ownerId);
+			}
+		}
 
         // Done drawing, restore overall state
         this.context.restore();

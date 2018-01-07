@@ -30,6 +30,7 @@ var playerClient = require('./js/PlayerClient');
 // List of currently connected clients
 var clientMap = new Map();
 var playerNum = 0;
+var flagNum = 0;
 var projectileNum = 0;
 
 /**
@@ -207,6 +208,13 @@ wsServer.on('request', function(request)
                     }}));
             }
         }
+		else if (json.type == 'addFlag')
+		{
+            for (var [connection, gameObject] of clientMap.entries())
+			{
+				connection.send(JSON.stringify(json));
+            }
+		}
         // Mimic each of these messages to all clients
         else if (json.type == 'removeProjectile' || json.type == 'removePlayer' ||
 			json.type == 'playerEnabled' || json.type == 'addDetonation')

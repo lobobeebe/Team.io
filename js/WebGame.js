@@ -83,6 +83,11 @@ connection.onopen = function ()
 		
         gameArea.players.set(json.data.id, newPlayer);
     }
+    else if (json.type == 'addFlag')
+	{
+        gameArea.addFlag(json.data.ownerId, json.data.x,
+			json.data.y, false);
+    }
     else if (json.type == 'updatePlayer')
 	{
 		gameArea.updatePlayer(json.data.id, json.data.x, json.data.y, json.data.angle,
