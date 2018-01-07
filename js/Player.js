@@ -239,12 +239,10 @@ Player.prototype =
     },
     update: function()
     {
-		
-        let cosAngle = Math.cos(this.angle);
-        let sinAngle = Math.sin(this.angle);
-		
 		/*
 		// Move towards mouse
+        let cosAngle = Math.cos(this.angle);
+        let sinAngle = Math.sin(this.angle);
         let nextX = this.x + (this.speed.y * cosAngle) + (this.speed.x * sinAngle);
         let nextY = this.y + (this.speed.y * sinAngle) - (this.speed.x * cosAngle);
 		*/
@@ -365,13 +363,28 @@ function SquarePlayer(gameArea)
 {
     Player.call(this, gameArea);
     this.type = "Shield";
+	this.isCharging = false;
+	this.chargeMaxSpeed = 7.5;
+	this.chargeAngle = null;
+	this.lastChargeTime = null;
+	this.chargeTimeMs = 1000;
     this.shieldRect = new Polygon([
 		{x: 0, y: 25},
 		{x: 0, y: -25},
 		{x: 25, y: -25},
 		{x: 25, y: 25}
 		]);
-		
+	
+    this.activateAbility = function()
+	{
+		if (!this.isCharging)
+		{
+			this.isCharging = true;
+			this.lastChargeTime = Date.now();
+			this.chargeAngle = this.angle;
+		}
+    }
+	
 	this.draw = function()
 	{
 		Player.prototype.draw.call(this);
@@ -421,11 +434,26 @@ function SquarePlayer(gameArea)
 
     this.update = function()
     {
+		// Update Charge
+		if (this.isCharging) 
+		{
+			this.angle = this.chargeAngle;
+			this.speed.x = this.chargeMaxSpeed * Math.cos(this.angle);
+			this.speed.y = this.chargeMaxSpeed * Math.sin(this.angle);
+			
+			// Reset charge
+			if (Date.now() > this.lastChargeTime + this.chargeTimeMs)
+			{
+				this.isCharging = false;
+			}
+		}
+		
         // Update base
         Player.prototype.update.call(this);
-
+		
         // Update shield location
         this.shieldRect.update(this.x, this.y, this.angle);
+		
     }
 }
 SquarePlayer.prototype = new Player();
