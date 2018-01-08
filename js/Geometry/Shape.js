@@ -110,3 +110,17 @@ function clamp(number, min, max)
 {
     return Math.max(min, Math.min(number, max));
 }
+
+function asNormal(vector)
+{
+	// Return base cases for Unit vectors or 0 vector
+	if ((vector.x == 0 && vector.y == 0) || 
+		(vector.x == 1 && vector.y == 0) || 
+		(vector.x == 0 && vector.y == 1))
+	{
+		return vector;
+	}
+	
+	let length = Math.sqrt(dotProduct(vector, vector));
+	return {x: vector.x / length, y: vector.y / length};
+}

@@ -182,20 +182,24 @@ Player.prototype =
         {
             if (keys[87])
             { /* W: Move forward */
-                this.speed.y = -maxSpeed;
+                this.speed.y = -1;
             }
             if (keys[83])
             { /* S: Move backward */
-                this.speed.y = maxSpeed;
+                this.speed.y = 1;
             }
             if (keys[65])
             { /* A: Strafe left */
-                this.speed.x = -maxSpeed;
+                this.speed.x = -1;
             }
             if (keys[68])
             { /* D: Strafe right */
-                this.speed.x = maxSpeed;
+                this.speed.x = 1;
             }
+			
+			this.speed = asNormal(this.speed);
+			this.speed.x *= maxSpeed;
+			this.speed.y *= maxSpeed;
 
             /* Space: Activate Ability */
             if (keys[32])
