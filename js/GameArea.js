@@ -105,6 +105,16 @@ function GameArea(connection)
 		this.connection.send(JSON.stringify({ type: 'joinRequest' }));
 	}
 	
+	this.removeFlag = function(flagId, fromLocal)
+	{
+		this.flags.delete(flagId);
+		
+		if (fromLocal)
+		{
+			this.connection.send(JSON.stringify({type: 'removeFlag', data: {id: flagId}}));
+		}
+	}
+	
 	this.removePlayer = function(playerId, fromLocal)
 	{
         this.players.delete(playerId);
@@ -119,7 +129,7 @@ function GameArea(connection)
 			}
 		}
 		
-		// Remove all projectiles that were shot by the remove player
+		// Remove all projectiles that were shot by the removed player
 		let projectileIds = [];
 		for (let [id, projectile] of this.projectiles)
 		{
@@ -132,6 +142,15 @@ function GameArea(connection)
 		for (let id of projectileIds)
 		{
 			this.removeProjectile(id, false);
+		}
+		
+		// Remove all flags that were placed by the removed player
+		for (let [id, flag] of this.flags)
+		{
+			if (id == playerId)
+			{
+				this.removeFlag(id, false);
+			}
 		}
 	}
 	
