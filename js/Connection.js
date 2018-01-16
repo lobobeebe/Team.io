@@ -11,7 +11,7 @@ function Connection(gameArea)
 	}
 
 	// open connection
-	let connection = new WebSocket('ws://18.218.90.135:8082');
+	this.connection = new WebSocket('ws://18.218.90.135:8082');
 	//this.connection = new WebSocket('ws://localhost:8082');
 	
 	this.connection.onopen = function ()
