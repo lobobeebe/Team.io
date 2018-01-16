@@ -1,3 +1,6 @@
+var Shape = require('./Shape.js');
+var Utils = require('./Utils.js');
+
 function Polygon(localPoints)
 {
     // Initialize member variables
@@ -44,7 +47,7 @@ Polygon.prototype.intersectsSegment = function(p1, p2)
 {
 	for (let i = 0, j = this.points.length - 1; i < this.points.length; j = i++)
 	{
-		doSegmentsDefinedByPointsIntersect(this.points[i], this.points[j], p1, p2);
+		Utils.doSegmentsDefinedByPointsIntersect(this.points[i], this.points[j], p1, p2);
 	}
 }
 
@@ -70,7 +73,7 @@ Polygon.prototype.update = function(x, y, angle)
 	
 	for (let i = 0; i < this.localPoints.length; ++i)
 	{
-		let point = getRotatedCoordinates(this.localPoints[i].x, this.localPoints[i].y, angle);
+		let point = Utils.getRotatedCoordinates(this.localPoints[i].x, this.localPoints[i].y, angle);
 		point.x += x;
 		point.y += y;
 		
@@ -79,3 +82,5 @@ Polygon.prototype.update = function(x, y, angle)
 	
 	this.points = points;
 }
+
+module.exports = Polygon;

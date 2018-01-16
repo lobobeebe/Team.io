@@ -1,3 +1,5 @@
+var Shape = require('./Shape.js');
+
 function Circle(radius)
 {
     // Initialize member variables
@@ -123,3 +125,5 @@ Circle.prototype.update = function(x, y, angle)
 		{x: this.x, y: this.y}
 	]
 }
+
+module.exports = Circle;

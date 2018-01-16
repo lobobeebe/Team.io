@@ -1,3 +1,5 @@
+var Polygon = require('./Polygon.js');
+
 function Rectangle(halfWidth, halfHeight)
 {
     // Initialize member variables
@@ -13,3 +15,5 @@ function Rectangle(halfWidth, halfHeight)
 }
 
 Rectangle.prototype = new Polygon();
+
+module.exports = Rectangle;

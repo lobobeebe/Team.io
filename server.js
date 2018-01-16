@@ -1,19 +1,25 @@
 "use strict";
-// Optional. You will see this name in eg. 'ps' or 'top' command
-process.title = 'team.io';
-// Port where we'll run the websocket server
-var webSocketsServerPort = 8082;
-var htmlServerPort = 80;
+
 // websocket and http servers
 const webSocketServer = require('websocket').server;
 const http = require('http');
 const fs = require("fs");
 const url = require('url');
 const path = require('path');
-var playerClient = require('./js/PlayerClient');
+const Player = require('./js/Player.js');
+const PlayerUtils = require('./js/PlayerUtils.js');
+const ServerGameArea = require('./js/ServerGameArea.js');
+const Client = require('./js/Client.js');
+
+// Optional. You will see this name in eg. 'ps' or 'top' command
+process.title = 'team.io';
+// Port where we'll run the websocket server
+var webSocketsServerPort = 8082;
+var htmlServerPort = 80;
 
 // maps file extention to MIME typere
-  const extMap = {
+const extMap =
+{
     '.ico': 'image/x-icon',
     '.html': 'text/html',
     '.js': 'text/javascript',
@@ -22,7 +28,7 @@ var playerClient = require('./js/PlayerClient');
     '.jpg': 'image/jpeg',
     '.wav': 'audio/wav',
     '.mp3': 'audio/mpeg'
-  };
+};
 
 /**
  * Global variables
@@ -32,6 +38,13 @@ var clientMap = new Map();
 var playerNum = 0;
 var flagNum = 0;
 var projectileNum = 0;
+
+var gameArea = new ServerGameArea();
+
+var gameInterval = setInterval(function()
+{
+	gameArea.update();
+}, 20);
 
 /**
  * HTTP Server for html
@@ -116,7 +129,6 @@ wsServer.on('request', function(request)
     // (http://en.wikipedia.org/wiki/Same_origin_policy)
     var connection = request.accept(null, request.origin);
 
-    clientMap.set(connection, new playerClient.Object());
     console.log((new Date()) + ' Connection accepted.');
 
     // user sent some message
@@ -124,69 +136,55 @@ wsServer.on('request', function(request)
 	{
         try
 		{
-          var json = JSON.parse(message.utf8Data);
+			var json = JSON.parse(message.utf8Data);
         }
 		catch (e)
 		{
-          console.log('Invalid JSON: ', message.data);
-          return;
+			console.log('Invalid JSON: ', message.data);
+			return;
         }
 
         if (json.type == "joinRequest")
 		{
-            // Tell the client his location and type with a joinResponse
-            var teams = ["Green", "Blue", "Red"];
-            var types = ["Shield", "Shooter", "Sneak"];
-
-            var playerObject = clientMap.get(this);
-
-            if (playerObject)
+            //var types = ["Shield", "Shooter", "Sneak"];
+            var types = ["Sneak"];
+			
+			// Create new player
+			let playerData =
 			{
-                playerObject.id = playerNum++;
-                playerObject.x = Math.random() * 1000;
-                playerObject.y = Math.random() * 600;
-                playerObject.angle = Math.random() * Math.PI * 2;
-                playerObject.team = "White";
-                playerObject.type = types[Math.floor(Math.random() * types.length)];
-            }
+				id: ++playerNum,
+				x: Math.random() * 1000,
+				y: Math.random() * 600,
+				angle: Math.random() * Math.PI * 2,
+				team: "White",
+				type: types[Math.floor(Math.random() * types.length)]
+			}
+			gameArea.updatePlayer(playerData.id, playerData);
+			clientMap.set(this, new Client(playerData.id));
 
-            var joinResponse = JSON.stringify({ type: 'joinResponse', data: playerObject.getJson()});
-            this.send(joinResponse);
+			// Tell player his ID
+            var joinResponse = JSON.stringify({ type: 'joinResponse', data: {id: playerData.id}});
             console.log((new Date()) + ' Sent message: ' + joinResponse);
-
+            this.send(joinResponse);
+			
             // Give new player the current location of all current players
-            for (var [connection, gameObject] of clientMap.entries())
+            for (var [connection, client] of clientMap.entries())
 			{
-                if (gameObject && connection != this)
+				let player = gameArea.players.get(client.playerId);
+				if (player)
 				{
-                    var addPlayer = JSON.stringify({ type: 'addPlayer', data: gameObject.getJson()});
-                    this.send(addPlayer);
-                }
+					var addPlayer = JSON.stringify({ type: 'updatePlayer', data: player.getJson()});
+					this.send(addPlayer);
+				}
             }
 
             // Iterate over all clients and indicate that a new player has come online
-            for (var [connection, gameObject] of clientMap.entries())
+            for (var [connection, client] of clientMap.entries())
 			{
                 if (connection != this)
 				{
                     connection.send(
-                        JSON.stringify({ type: 'addPlayer', data: playerObject.getJson()} ));
-                }
-            }
-        }
-        else if (json.type == 'updatePlayer')
-		{
-            var playerObject = clientMap.get(this);
-            playerObject.x = json.data.x;
-            playerObject.y = json.data.y;
-            playerObject.angle = json.data.angle;
-
-            for (var [connection, gameObject] of clientMap.entries())
-			{
-                if (connection != this)
-				{
-                    connection.send(
-                        JSON.stringify({ type: 'updatePlayer', data: playerObject.getJson()} ));
+                        JSON.stringify({ type: 'updatePlayer', data: playerData} ));
                 }
             }
         }
@@ -194,7 +192,7 @@ wsServer.on('request', function(request)
 		{
             let projectileId = projectileNum++;
             // Notify all clients of a new projectile
-            for (let [connection, gameObject] of clientMap.entries())
+            for (let [connection, client] of clientMap.entries())
 			{
                 connection.send(
                     JSON.stringify({ type: 'addProjectile', data: {
@@ -210,16 +208,35 @@ wsServer.on('request', function(request)
         }
 		else if (json.type == 'addFlag')
 		{
-            for (var [connection, gameObject] of clientMap.entries())
+            for (var [connection, client] of clientMap.entries())
 			{
 				connection.send(JSON.stringify(json));
             }
+		}
+		else if (json.type == 'input')
+		{
+			let inputClient = clientMap.get(this);
+			if (inputClient)
+			{
+				let player = gameArea.players.get(inputClient.playerId);
+				if (player)
+				{
+					player.processInput(json.data.key, json.data.isDown);
+					
+					// Update all clients
+					for (let [connection, client] of clientMap.entries())
+					{
+						connection.send(
+							JSON.stringify({ type: 'updatePlayer', data: player.getJson()} ));
+					}
+				}
+			}
 		}
         // Mimic each of these messages to all clients
         else if (json.type == 'removeProjectile' || json.type == 'removePlayer' ||
 			json.type == 'playerEnabled' || json.type == 'addDetonation')
 		{
-            for (var [connection, gameObject] of clientMap.entries())
+            for (var [connection, client] of clientMap.entries())
 			{
 				if (connection != this)
 				{
@@ -234,10 +251,10 @@ wsServer.on('request', function(request)
         console.log((new Date()) + " Peer " + connection.remoteAddress + " disconnected.");
 
         // remove user from the list of connected clients
-        var deletedId = clientMap.get(this).id;
+        var deletedId = clientMap.get(this).playerId;
         clientMap.delete(this);
 
-        for (var [connection, gameObject] of clientMap.entries()) {
+        for (var [connection, client] of clientMap.entries()) {
             connection.send(
                 JSON.stringify({ type: 'removePlayer', data: {id: deletedId}}));
         }
