@@ -13,8 +13,8 @@ module.exports =
 	 */
 	doSegmentsDefinedByPointsIntersect: function(a, b, c, d)
 	{
-		if (Math.sign(outerProduct(a, c, d)) != Math.sign(outerProduct(b, c, d)) &&
-			Math.sign(outerProduct(c, a, b)) != Math.sign(outerProduct(d, a, b)))
+		if (Math.sign(module.exports.outerProduct(a, c, d)) != Math.sign(module.exports.outerProduct(b, c, d)) &&
+			Math.sign(module.exports.outerProduct(c, a, b)) != Math.sign(module.exports.outerProduct(d, a, b)))
 		{
 			return true;
 		}

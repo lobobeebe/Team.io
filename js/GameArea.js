@@ -4,76 +4,13 @@ var PlayerUtils = require('./PlayerUtils.js');
 
 function GameArea()
 {
+	this.frameNo = 0;
+	
 	this.players = new Map();
 	this.projectiles = new Map();
 	this.flags = new Map();
 	
 	this.bounds = new Rectangle(1000, 1000);
-	
-	this.addFlag = function(id, flag)
-	{
-		this.flags.set(id, flag);
-	}
-	
-	this.addProjectile = function(id, projectile)
-	{		
-		this.projectiles.set(id, projectile);
-	}
-	
-	this.addPlayer = function(id, player)
-	{
-		this.players.set(id, player);
-	}
-	
-	this.removeFlag = function(flagId)
-	{
-		this.flags.delete(flagId);
-	}
-	
-	this.removePlayer = function(playerId)
-	{
-		this.players.delete(playerId);
-		
-		// Remove all projectiles that were shot by the removed player
-		let projectileIds = [];
-		for (let [id, projectile] of this.projectiles)
-		{
-			if (projectile.shooterId == playerId)
-			{
-				this.removeProjectile(id, false);
-			}
-		}
-		
-		// Remove all flags that were placed by the removed player
-		for (let [id, flag] of this.flags)
-		{
-			if (id == playerId)
-			{
-				this.removeFlag(id, false);
-			}
-		}
-	}
-	
-	this.removeProjectile = function(projectileId)
-	{
-		let projectile = this.projectiles.get(projectileId);
-		if (projectile)
-		{
-			projectile.deactivate();
-		}
-		
-		this.projectiles.delete(projectileId);
-	}
-	
-	this.setPlayerIsEnabled = function(playerId, isEnabled)
-	{
-		let player = this.players.get(playerId);
-		
-		if (player)
-		{
-			player.isEnabled = isEnabled;	
-		}
-	}
 
 	this.stop = function()
 	{
@@ -106,8 +43,75 @@ function GameArea()
 	}
 }
 
+GameArea.prototype.addFlag = function(id, flag)
+{
+	this.flags.set(id, flag);
+}
+
+GameArea.prototype.addPlayer = function(id, player)
+{
+	this.players.set(id, player);
+}
+
+GameArea.prototype.addProjectile = function(id, projectile)
+{		
+	this.projectiles.set(id, projectile);
+}
+
+GameArea.prototype.removeFlag = function(flagId)
+{
+	this.flags.delete(flagId);
+}
+
+GameArea.prototype.removePlayer = function(playerId)
+{
+	this.players.delete(playerId);
+	
+	// Remove all projectiles that were shot by the removed player
+	let projectileIds = [];
+	for (let [id, projectile] of this.projectiles)
+	{
+		if (projectile.shooterId == playerId)
+		{
+			this.removeProjectile(id);
+		}
+	}
+	
+	// Remove all flags that were placed by the removed player
+	for (let [id, flag] of this.flags)
+	{
+		if (id == playerId)
+		{
+			this.removeFlag(id);
+		}
+	}
+}
+
+GameArea.prototype.removeProjectile = function(projectileId)
+{
+	let projectile = this.projectiles.get(projectileId);
+	if (projectile)
+	{
+		projectile.deactivate();
+	}
+	
+	this.projectiles.delete(projectileId);
+}
+
+GameArea.prototype.setPlayerIsEnabled = function(playerId, isEnabled)
+{
+	let player = this.players.get(playerId);
+	
+	if (player)
+	{
+		player.isEnabled = isEnabled;	
+	}
+}
+
 GameArea.prototype.update = function()
 {
+	this.frameNo++;
+	
 	// Update Projectiles
 	for (let [id, projectile] of this.projectiles)
 	{

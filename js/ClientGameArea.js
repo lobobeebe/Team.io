@@ -1,7 +1,8 @@
-var GameArea = require('./GameArea.js');
-var CirclePlayer = require('./CirclePlayer.js');
-var SquarePlayer = require('./SquarePlayer.js');
-var TrianglePlayer = require('./TrianglePlayer.js');
+const GameArea = require('./GameArea.js');
+const CirclePlayer = require('./CirclePlayer.js');
+const SquarePlayer = require('./SquarePlayer.js');
+const TrianglePlayer = require('./TrianglePlayer.js');
+const ProjectileUtils = require('./ProjectileUtils');
 
 function ClientGameArea()
 {
@@ -75,9 +76,42 @@ function ClientGameArea()
 		return null;
 	}
 	
-	this.setMainPlayerId = function(id)
+	this.processMessage = function(type, data)
 	{
-		this.mainPlayerId = id;
+		if (type == 'joinResponse')
+		{
+			this.mainPlayerId = data.id;
+		}
+		else if (type == 'addFlag')
+		{
+			this.addFlag(data.id, new Flag(data.team, data.id, data.x, data.y, this));
+		}
+		else if (type == 'updatePlayer')
+		{
+			this.updatePlayer(data.id, data);
+		}
+		else if (type == 'addProjectile')
+		{
+			let projectile = ProjectileUtils.create(data.type, data, this);
+			
+			this.addProjectile(data.id, projectile);
+		}
+		else if (type == 'removeProjectile')
+		{
+			this.removeProjectile(data.id);
+		}
+		else if (type == 'removePlayer')
+		{
+			this.removePlayer(data.id);
+		}
+		else if (type == 'playerEnabled')
+		{
+			this.setPlayerIsEnabled(data.id, data.isEnabled);
+		}
+		else
+		{
+			console.log('Hmm..., I\'ve never seen a message like this:', type, data);
+		}
 	}
 	
 	this.update = function()
@@ -98,19 +132,19 @@ function ClientGameArea()
 		// Draw Projectiles
 		for (let [id, projectile] of this.projectiles)
 		{
-			projectile.draw();
+			projectile.draw(this.context);
 		}
 		
 		// Draw Flags
 		for (let [id, flag] of this.flags)
 		{
-			flag.draw();
+			flag.draw(this.context);
 		}
 		
 		// Draw Players
 		for (let [id, player] of this.players)
 		{
-			player.draw();
+			player.draw(this.context);
 		}
 
 		// Done drawing, restore overall state

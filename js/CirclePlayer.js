@@ -1,5 +1,6 @@
-var Player = require('./Player.js');
-var Circle = require('./Geometry/Circle.js');
+const Player = require('./Player');
+const Circle = require('./Geometry/Circle');
+const Bomb = require('./Bomb');
 
 function CirclePlayer(data, gameArea)
 {
@@ -11,19 +12,19 @@ function CirclePlayer(data, gameArea)
 
     this.activateAbility = function()
     {
-		this.gameArea.addProjectile(-1, "Bomb", this.x, this.y, this.angle, this.team, this.id, true);
+		let projectile = new Bomb(this.x, this.y, this.angle, this.team, this.gameArea);
+		this.gameArea.addProjectile(projectile);
     }
 	
-	this.draw = function()
+	this.draw = function(context)
 	{
-		let context = this.gameArea.context;
 		let colors = this.getColors();
 		
 		context.fillStyle = colors.secondary;
 		this.front.draw(context);
 		context.fill();
 		
-		Player.prototype.draw.call(this);
+		Player.prototype.draw.call(this, context);
 	}
 	
 	this.intersects = function(shape)

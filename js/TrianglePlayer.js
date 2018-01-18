@@ -1,4 +1,6 @@
-var Player = require('./Player.js');
+const Player = require('./Player');
+const Polygon = require('./Geometry/Polygon');
+const Bullet = require('./Bullet');
 
 function TrianglePlayer(data, gameArea)
 {
@@ -13,20 +15,20 @@ function TrianglePlayer(data, gameArea)
 
     this.activateAbility = function()
 	{
-		gameArea.addProjectile(-1, "Bullet", this.x + 25 * Math.cos(this.angle),
-			this.y + 25 * Math.sin(this.angle), this.angle, this.team, this.id, true);
+		let projectile = new Bullet(this.x + 25 * Math.cos(this.angle), this.y + 25 * Math.sin(this.angle),
+			this.angle, this.team, this.gameArea);
+		this.gameArea.addProjectile(projectile);
     }
 	
-	this.draw = function()
+	this.draw = function(context)
 	{
-		let context = this.gameArea.context;
 		let colors = this.getColors();
 		
 		context.fillStyle = colors.secondary;
 		this.front.draw(context);
 		context.fill();
 		
-		Player.prototype.draw.call(this);
+		Player.prototype.draw.call(this, context);
 	}
 	
 	this.intersects = function(shape)

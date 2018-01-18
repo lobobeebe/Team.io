@@ -47,9 +47,8 @@ Player.prototype =
         return (player.team != this.team ||
             (player.team  == "White" && player.id != this.id));
     },
-    draw: function()
+    draw: function(context)
     {
-        let context = this.gameArea.context;
 		let colors = this.getColors();
 		
 		context.fillStyle = colors.primary;

@@ -1,7 +1,7 @@
-function Flag(team, ownerId, x, y, gameArea)
+function Flag(team, id, x, y, gameArea)
 {
     this.team = team;
-    this.ownerId = ownerId;
+    this.ownerId = id;
     this.gameArea = gameArea;
     this.x = x;
     this.y = y;

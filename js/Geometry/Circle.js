@@ -1,4 +1,5 @@
-var Shape = require('./Shape.js');
+const Shape = require('./Shape');
+const Utils = require('./Utils');
 
 function Circle(radius)
 {
@@ -46,9 +47,9 @@ Circle.prototype.intersectsSegment = function(p1, p2)
 	let startToCenter = {x: p1.x - this.x, y: p1.y - this.y};
 	
 	
-	let a = dotProduct(difference, difference);
-	let b = 2 * dotProduct(startToCenter, difference);
-	let c = dotProduct(startToCenter, startToCenter) - this.squaredRadius;
+	let a = Utils.dotProduct(difference, difference);
+	let b = 2 * Utils.dotProduct(startToCenter, difference);
+	let c = Utils.dotProduct(startToCenter, startToCenter) - this.squaredRadius;
 
 	let discriminant = (b * b) - (4 * a * c);
 	if (discriminant < 0)

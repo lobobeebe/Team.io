@@ -44,9 +44,77 @@ var gameInterval = setInterval(function()
 }, 20);
 
 });
-},{"./js/ClientGameArea.js":3,"./js/Connection.js":4}],2:[function(require,module,exports){
-var Player = require('./Player.js');
-var Circle = require('./Geometry/Circle.js');
+},{"./js/ClientGameArea.js":5,"./js/Connection.js":6}],2:[function(require,module,exports){
+const Circle = require('./Geometry/Circle');
+const Projectile = require('./Projectile');
+
+function Bomb(x, y, angle, team, gameArea)
+{
+    Projectile.call(this, x, y, angle, team, gameArea);
+    this.speed = 0;
+    this.type = "Bomb";
+	this.detonation = new Circle(100);
+	this.shape = new Circle(15);
+	
+	this.shape.update(this.x, this.y, this.angle);
+	this.detonation.update(this.x, this.y, this.angle);
+
+    this.deactivate = function()
+    {
+		if (this.gameArea.mainPlayer && this.gameArea.mainPlayer.isProjectileOpponent(this) &&
+			this.gameArea.mainPlayer.intersects(this.detonation))
+		{
+            this.gameArea.mainPlayer.hit(this);
+		}
+	}
+
+    this.draw = function()
+    {
+        // Only draw Bomb if the mainPlayer is on the same team.
+        if (this.gameArea.mainPlayer && !this.gameArea.mainPlayer.isProjectileOpponent(this))
+        {
+			Projectile.prototype.draw.call(this);
+			
+			let context = this.gameArea.context;
+			
+			context.save();
+			context.setLineDash([15,15]);
+			this.detonation.draw(context);
+			context.stroke();
+			context.restore();
+        }
+    }
+	
+	this.update = function()
+	{
+		Projectile.prototype.update.call(this);
+		
+		this.detonation.update(this.x, this.y, this.angle);
+	}
+}
+Bomb.prototype = new Projectile();
+
+module.exports = Bomb;
+},{"./Geometry/Circle":8,"./Projectile":15}],3:[function(require,module,exports){
+const Projectile = require('./Projectile');
+const Rectangle = require('./Geometry/Rectangle');
+
+function Bullet(x, y, angle, team, gameArea)
+{
+    Projectile.call(this, x, y, angle, team, gameArea);
+    this.height = 5;
+    this.speed = 10;
+    this.width = 10;
+    this.type = "Bullet";
+	this.shape = new Rectangle(5, 5);
+}
+Bullet.prototype = new Projectile();
+
+module.exports = Bullet;
+},{"./Geometry/Rectangle":10,"./Projectile":15}],4:[function(require,module,exports){
+const Player = require('./Player');
+const Circle = require('./Geometry/Circle');
+const Bomb = require('./Bomb');
 
 function CirclePlayer(data, gameArea)
 {
@@ -58,19 +126,19 @@ function CirclePlayer(data, gameArea)
 
     this.activateAbility = function()
     {
-		this.gameArea.addProjectile(-1, "Bomb", this.x, this.y, this.angle, this.team, this.id, true);
+		let projectile = new Bomb(this.x, this.y, this.angle, this.team, this.gameArea);
+		this.gameArea.addProjectile(projectile);
     }
 	
-	this.draw = function()
+	this.draw = function(context)
 	{
-		let context = this.gameArea.context;
 		let colors = this.getColors();
 		
 		context.fillStyle = colors.secondary;
 		this.front.draw(context);
 		context.fill();
 		
-		Player.prototype.draw.call(this);
+		Player.prototype.draw.call(this, context);
 	}
 	
 	this.intersects = function(shape)
@@ -106,11 +174,12 @@ function CirclePlayer(data, gameArea)
 CirclePlayer.prototype = new Player();
 
 module.exports = CirclePlayer;
-},{"./Geometry/Circle.js":6,"./Player.js":11}],3:[function(require,module,exports){
-var GameArea = require('./GameArea.js');
-var CirclePlayer = require('./CirclePlayer.js');
-var SquarePlayer = require('./SquarePlayer.js');
-var TrianglePlayer = require('./TrianglePlayer.js');
+},{"./Bomb":2,"./Geometry/Circle":8,"./Player":13}],5:[function(require,module,exports){
+const GameArea = require('./GameArea.js');
+const CirclePlayer = require('./CirclePlayer.js');
+const SquarePlayer = require('./SquarePlayer.js');
+const TrianglePlayer = require('./TrianglePlayer.js');
+const ProjectileUtils = require('./ProjectileUtils');
 
 function ClientGameArea()
 {
@@ -184,9 +253,42 @@ function ClientGameArea()
 		return null;
 	}
 	
-	this.setMainPlayerId = function(id)
+	this.processMessage = function(type, data)
 	{
-		this.mainPlayerId = id;
+		if (type == 'joinResponse')
+		{
+			this.mainPlayerId = data.id;
+		}
+		else if (type == 'addFlag')
+		{
+			this.addFlag(data.id, new Flag(data.team, data.id, data.x, data.y, this));
+		}
+		else if (type == 'updatePlayer')
+		{
+			this.updatePlayer(data.id, data);
+		}
+		else if (type == 'addProjectile')
+		{
+			let projectile = ProjectileUtils.create(data.type, data, this);
+			
+			this.addProjectile(data.id, projectile);
+		}
+		else if (type == 'removeProjectile')
+		{
+			this.removeProjectile(data.id);
+		}
+		else if (type == 'removePlayer')
+		{
+			this.removePlayer(data.id);
+		}
+		else if (type == 'playerEnabled')
+		{
+			this.setPlayerIsEnabled(data.id, data.isEnabled);
+		}
+		else
+		{
+			console.log('Hmm..., I\'ve never seen a message like this:', type, data);
+		}
 	}
 	
 	this.update = function()
@@ -207,19 +309,19 @@ function ClientGameArea()
 		// Draw Projectiles
 		for (let [id, projectile] of this.projectiles)
 		{
-			projectile.draw();
+			projectile.draw(this.context);
 		}
 		
 		// Draw Flags
 		for (let [id, flag] of this.flags)
 		{
-			flag.draw();
+			flag.draw(this.context);
 		}
 		
 		// Draw Players
 		for (let [id, player] of this.players)
 		{
-			player.draw();
+			player.draw(this.context);
 		}
 
 		// Done drawing, restore overall state
@@ -246,9 +348,11 @@ function ClientGameArea()
 ClientGameArea.prototype = new GameArea();
 
 module.exports = ClientGameArea;
-},{"./CirclePlayer.js":2,"./GameArea.js":5,"./SquarePlayer.js":13,"./TrianglePlayer.js":14}],4:[function(require,module,exports){
+},{"./CirclePlayer.js":4,"./GameArea.js":7,"./ProjectileUtils":16,"./SquarePlayer.js":17,"./TrianglePlayer.js":18}],6:[function(require,module,exports){
 function Connection(gameArea)
 {
+	this.gameArea = gameArea;
+	
 	// if user is running mozilla then use it's built-in WebSocket
 	window.WebSocket = window.WebSocket || window.MozWebSocket;
 	// if browser doesn't support WebSocket, just show
@@ -260,8 +364,8 @@ function Connection(gameArea)
 	}
 
 	// open connection
-	this.connection = new WebSocket('ws://18.218.90.135:8082');
-	//this.connection = new WebSocket('ws://localhost:8082');
+	//this.connection = new WebSocket('ws://18.218.90.135:8082');
+	this.connection = new WebSocket('ws://localhost:8082');
 	
 	this.connection.onopen = function ()
 	{
@@ -287,121 +391,25 @@ function Connection(gameArea)
 			return;
 		}
 
-		if (json.type == 'joinResponse')
-		{
-			gameArea.setMainPlayerId(json.data.id);
-		}
-		else if (json.type == 'addFlag')
-		{
-			gameArea.addFlag(json.data.ownerId, json.data.x,
-				json.data.y, false);
-		}
-		else if (json.type == 'updatePlayer')
-		{
-			gameArea.updatePlayer(json.data.id, json.data);
-		}
-		else if (json.type == 'addProjectile')
-		{
-			gameArea.addProjectile(json.data.id, json.data.type, json.data.x, json.data.y, json.data.angle,
-				json.data.team, json.data.shooterId, false);
-		}
-		else if (json.type == 'removeProjectile')
-		{
-			gameArea.removeProjectile(json.data.id, false);
-		}
-		else if (json.type == 'removePlayer')
-		{
-			gameArea.removePlayer(json.data.id, false);
-		}
-		else if (json.type == 'playerEnabled')
-		{
-			gameArea.setPlayerIsEnabled(json.data.id, json.data.isEnabled, false);
-		}
-		else
-		{
-			console.log('Hmm..., I\'ve never seen JSON like this:', json);
-		}
+		gameArea.processMessage(json.type, json.data);
 	};
 }
 
 module.exports = Connection;
-},{}],5:[function(require,module,exports){
+},{}],7:[function(require,module,exports){
 var Rectangle = require('./Geometry/Rectangle.js');
 var Player = require('./Player.js');
 var PlayerUtils = require('./PlayerUtils.js');
 
 function GameArea()
 {
+	this.frameNo = 0;
+	
 	this.players = new Map();
 	this.projectiles = new Map();
 	this.flags = new Map();
 	
 	this.bounds = new Rectangle(1000, 1000);
-	
-	this.addFlag = function(id, flag)
-	{
-		this.flags.set(id, flag);
-	}
-	
-	this.addProjectile = function(id, projectile)
-	{		
-		this.projectiles.set(id, projectile);
-	}
-	
-	this.addPlayer = function(id, player)
-	{
-		this.players.set(id, player);
-	}
-	
-	this.removeFlag = function(flagId)
-	{
-		this.flags.delete(flagId);
-	}
-	
-	this.removePlayer = function(playerId)
-	{
-		this.players.delete(playerId);
-		
-		// Remove all projectiles that were shot by the removed player
-		let projectileIds = [];
-		for (let [id, projectile] of this.projectiles)
-		{
-			if (projectile.shooterId == playerId)
-			{
-				this.removeProjectile(id, false);
-			}
-		}
-		
-		// Remove all flags that were placed by the removed player
-		for (let [id, flag] of this.flags)
-		{
-			if (id == playerId)
-			{
-				this.removeFlag(id, false);
-			}
-		}
-	}
-	
-	this.removeProjectile = function(projectileId)
-	{
-		let projectile = this.projectiles.get(projectileId);
-		if (projectile)
-		{
-			projectile.deactivate();
-		}
-		
-		this.projectiles.delete(projectileId);
-	}
-	
-	this.setPlayerIsEnabled = function(playerId, isEnabled)
-	{
-		let player = this.players.get(playerId);
-		
-		if (player)
-		{
-			player.isEnabled = isEnabled;	
-		}
-	}
 
 	this.stop = function()
 	{
@@ -434,8 +442,75 @@ function GameArea()
 	}
 }
 
+GameArea.prototype.addFlag = function(id, flag)
+{
+	this.flags.set(id, flag);
+}
+
+GameArea.prototype.addPlayer = function(id, player)
+{
+	this.players.set(id, player);
+}
+
+GameArea.prototype.addProjectile = function(id, projectile)
+{		
+	this.projectiles.set(id, projectile);
+}
+
+GameArea.prototype.removeFlag = function(flagId)
+{
+	this.flags.delete(flagId);
+}
+
+GameArea.prototype.removePlayer = function(playerId)
+{
+	this.players.delete(playerId);
+	
+	// Remove all projectiles that were shot by the removed player
+	let projectileIds = [];
+	for (let [id, projectile] of this.projectiles)
+	{
+		if (projectile.shooterId == playerId)
+		{
+			this.removeProjectile(id);
+		}
+	}
+	
+	// Remove all flags that were placed by the removed player
+	for (let [id, flag] of this.flags)
+	{
+		if (id == playerId)
+		{
+			this.removeFlag(id);
+		}
+	}
+}
+
+GameArea.prototype.removeProjectile = function(projectileId)
+{
+	let projectile = this.projectiles.get(projectileId);
+	if (projectile)
+	{
+		projectile.deactivate();
+	}
+	
+	this.projectiles.delete(projectileId);
+}
+
+GameArea.prototype.setPlayerIsEnabled = function(playerId, isEnabled)
+{
+	let player = this.players.get(playerId);
+	
+	if (player)
+	{
+		player.isEnabled = isEnabled;	
+	}
+}
+
 GameArea.prototype.update = function()
 {
+	this.frameNo++;
+	
 	// Update Projectiles
 	for (let [id, projectile] of this.projectiles)
 	{
@@ -471,8 +546,9 @@ GameArea.prototype.update = function()
 }
 
 module.exports = GameArea;
-},{"./Geometry/Rectangle.js":8,"./Player.js":11,"./PlayerUtils.js":12}],6:[function(require,module,exports){
-var Shape = require('./Shape.js');
+},{"./Geometry/Rectangle.js":10,"./Player.js":13,"./PlayerUtils.js":14}],8:[function(require,module,exports){
+const Shape = require('./Shape');
+const Utils = require('./Utils');
 
 function Circle(radius)
 {
@@ -520,9 +596,9 @@ Circle.prototype.intersectsSegment = function(p1, p2)
 	let startToCenter = {x: p1.x - this.x, y: p1.y - this.y};
 	
 	
-	let a = dotProduct(difference, difference);
-	let b = 2 * dotProduct(startToCenter, difference);
-	let c = dotProduct(startToCenter, startToCenter) - this.squaredRadius;
+	let a = Utils.dotProduct(difference, difference);
+	let b = 2 * Utils.dotProduct(startToCenter, difference);
+	let c = Utils.dotProduct(startToCenter, startToCenter) - this.squaredRadius;
 
 	let discriminant = (b * b) - (4 * a * c);
 	if (discriminant < 0)
@@ -601,7 +677,7 @@ Circle.prototype.update = function(x, y, angle)
 }
 
 module.exports = Circle;
-},{"./Shape.js":9}],7:[function(require,module,exports){
+},{"./Shape":11,"./Utils":12}],9:[function(require,module,exports){
 var Shape = require('./Shape.js');
 var Utils = require('./Utils.js');
 
@@ -688,7 +764,7 @@ Polygon.prototype.update = function(x, y, angle)
 }
 
 module.exports = Polygon;
-},{"./Shape.js":9,"./Utils.js":10}],8:[function(require,module,exports){
+},{"./Shape.js":11,"./Utils.js":12}],10:[function(require,module,exports){
 var Polygon = require('./Polygon.js');
 
 function Rectangle(halfWidth, halfHeight)
@@ -708,7 +784,7 @@ function Rectangle(halfWidth, halfHeight)
 Rectangle.prototype = new Polygon();
 
 module.exports = Rectangle;
-},{"./Polygon.js":7}],9:[function(require,module,exports){
+},{"./Polygon.js":9}],11:[function(require,module,exports){
 function Shape()
 {
     // Initialize member variables
@@ -771,7 +847,7 @@ Shape.prototype =
 }
 
 module.exports = Shape;
-},{}],10:[function(require,module,exports){
+},{}],12:[function(require,module,exports){
 module.exports = 
 {
 	mod: function(n, m)
@@ -787,8 +863,8 @@ module.exports =
 	 */
 	doSegmentsDefinedByPointsIntersect: function(a, b, c, d)
 	{
-		if (Math.sign(outerProduct(a, c, d)) != Math.sign(outerProduct(b, c, d)) &&
-			Math.sign(outerProduct(c, a, b)) != Math.sign(outerProduct(d, a, b)))
+		if (Math.sign(module.exports.outerProduct(a, c, d)) != Math.sign(module.exports.outerProduct(b, c, d)) &&
+			Math.sign(module.exports.outerProduct(c, a, b)) != Math.sign(module.exports.outerProduct(d, a, b)))
 		{
 			return true;
 		}
@@ -846,7 +922,7 @@ module.exports =
 	}
 
 }
-},{}],11:[function(require,module,exports){
+},{}],13:[function(require,module,exports){
 var Polygon = require('./Geometry/Polygon.js');
 var Utils = require('./Geometry/Utils.js');
 
@@ -896,9 +972,8 @@ Player.prototype =
         return (player.team != this.team ||
             (player.team  == "White" && player.id != this.id));
     },
-    draw: function()
+    draw: function(context)
     {
-        let context = this.gameArea.context;
 		let colors = this.getColors();
 		
 		context.fillStyle = colors.primary;
@@ -1140,7 +1215,7 @@ Player.prototype =
 }
 
 module.exports = Player;
-},{"./Geometry/Polygon.js":7,"./Geometry/Utils.js":10}],12:[function(require,module,exports){
+},{"./Geometry/Polygon.js":9,"./Geometry/Utils.js":12}],14:[function(require,module,exports){
 var CirclePlayer = require('./CirclePlayer.js');
 var SquarePlayer = require('./SquarePlayer.js');
 var TrianglePlayer = require('./TrianglePlayer.js');
@@ -1170,8 +1245,87 @@ module.exports =
 		return player;
 	}
 }
-},{"./CirclePlayer.js":2,"./SquarePlayer.js":13,"./TrianglePlayer.js":14}],13:[function(require,module,exports){
-var Player = require('./Player.js');
+},{"./CirclePlayer.js":4,"./SquarePlayer.js":17,"./TrianglePlayer.js":18}],15:[function(require,module,exports){
+function Projectile(x, y, angle, team, gameArea)
+{
+    this.angle = angle;
+    this.gameArea = gameArea;
+    this.team = team;
+    this.x = x;
+    this.y = y;
+    this.shooterId = -1;
+    this.type = "None";
+	
+	this.shape = null;
+}
+
+Projectile.prototype =
+{
+    deactivate: function()
+    {
+        // No implementation at base
+    },
+    draw: function(context)
+    {
+		this.shape.draw(context);
+		context.fill();
+    },
+	getJson: function()
+	{
+		let json = 
+		{
+			angle: this.angle,
+			team: this.team,
+			x: this.x,
+			y: this.y,
+			shooterId: this.shooterId,
+			type: this.type
+		}
+		return json;
+	},
+    update: function()
+    {
+        if (this.speed > 0)
+        {
+            this.x += this.speed * Math.cos(this.angle);
+            this.y += this.speed * Math.sin(this.angle);
+			
+			this.shape.update(this.x, this.y, this.angle);
+        }
+    }
+}
+
+module.exports = Projectile;
+},{}],16:[function(require,module,exports){
+const Bomb = require('./Bomb');
+const Bullet = require('./Bullet');
+
+module.exports = 
+{
+	create: function(projectileType, data, gameArea)
+	{
+		let projectile;
+
+		switch (projectileType)
+		{
+			case "Bomb":
+				projectile = new Bomb(data.x, data.y, data.angle, data.team, gameArea);
+				break;
+
+			case "Bullet":
+			default:
+				projectile = new Bullet(data.x, data.y, data.angle, data.team, data.gameArea);
+				break;
+		}
+
+		projectile.shooterId = data.shooterId;
+
+		return projectile;
+	}
+}
+},{"./Bomb":2,"./Bullet":3}],17:[function(require,module,exports){
+var Player = require('./Player');
+var Polygon = require('./Geometry/Polygon');
 
 function SquarePlayer(data, gameArea)
 {
@@ -1199,11 +1353,10 @@ function SquarePlayer(data, gameArea)
 		}
     }
 	
-	this.draw = function()
+	this.draw = function(context)
 	{
-		Player.prototype.draw.call(this);
+		Player.prototype.draw.call(this, context);
 		
-		let context = this.gameArea.context;
 		let colors = this.getColors();
 		
 		context.fillStyle = colors.secondary;
@@ -1273,8 +1426,10 @@ function SquarePlayer(data, gameArea)
 SquarePlayer.prototype = new Player();
 
 module.exports = SquarePlayer;
-},{"./Player.js":11}],14:[function(require,module,exports){
-var Player = require('./Player.js');
+},{"./Geometry/Polygon":9,"./Player":13}],18:[function(require,module,exports){
+const Player = require('./Player');
+const Polygon = require('./Geometry/Polygon');
+const Bullet = require('./Bullet');
 
 function TrianglePlayer(data, gameArea)
 {
@@ -1289,20 +1444,20 @@ function TrianglePlayer(data, gameArea)
 
     this.activateAbility = function()
 	{
-		gameArea.addProjectile(-1, "Bullet", this.x + 25 * Math.cos(this.angle),
-			this.y + 25 * Math.sin(this.angle), this.angle, this.team, this.id, true);
+		let projectile = new Bullet(this.x + 25 * Math.cos(this.angle), this.y + 25 * Math.sin(this.angle),
+			this.angle, this.team, this.gameArea);
+		this.gameArea.addProjectile(projectile);
     }
 	
-	this.draw = function()
+	this.draw = function(context)
 	{
-		let context = this.gameArea.context;
 		let colors = this.getColors();
 		
 		context.fillStyle = colors.secondary;
 		this.front.draw(context);
 		context.fill();
 		
-		Player.prototype.draw.call(this);
+		Player.prototype.draw.call(this, context);
 	}
 	
 	this.intersects = function(shape)
@@ -1319,4 +1474,4 @@ function TrianglePlayer(data, gameArea)
 TrianglePlayer.prototype = new Player();
 
 module.exports = TrianglePlayer;
-},{"./Player.js":11}]},{},[1]);
+},{"./Bullet":3,"./Geometry/Polygon":9,"./Player":13}]},{},[1]);

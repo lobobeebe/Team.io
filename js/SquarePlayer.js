@@ -1,4 +1,5 @@
-var Player = require('./Player.js');
+var Player = require('./Player');
+var Polygon = require('./Geometry/Polygon');
 
 function SquarePlayer(data, gameArea)
 {
@@ -26,11 +27,10 @@ function SquarePlayer(data, gameArea)
 		}
     }
 	
-	this.draw = function()
+	this.draw = function(context)
 	{
-		Player.prototype.draw.call(this);
+		Player.prototype.draw.call(this, context);
 		
-		let context = this.gameArea.context;
 		let colors = this.getColors();
 		
 		context.fillStyle = colors.secondary;
